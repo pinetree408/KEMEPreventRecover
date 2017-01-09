@@ -14,6 +14,8 @@ import com.sun.jna.Platform;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import java.awt.AWTException;
 import java.awt.Robot;
@@ -109,6 +111,8 @@ public class PreventRecover implements NativeKeyListener {
     }
 
     public void nativeKeyPressed(NativeKeyEvent e) {
+
+
 
         if ((state.equals("checking")) && (limitNumber < 11)) {
 
@@ -260,6 +264,50 @@ public class PreventRecover implements NativeKeyListener {
 
         GlobalScreen.addNativeKeyListener(new PreventRecover());
 
+        Timer jobScheduler = new Timer();
+        jobScheduler.schedule(new TimerTask() {
+            @Override
+            public void run() {
+
+                nowTopProcess =  util.nowTopProcess();
+
+                if (!nowTopProcess.equals("")) {
+
+                    if (!prevTopProcess.equals(nowTopProcess)) {
+
+                        state = "prevent";
+
+                        prevTopProcess = util.nowTopProcess();
+
+                        nowLanguage = util.nowLanguage();
+
+                        limitNumber = 0;
+                        recoverState = 1;
+                        restoreString.clear();
+                        tmpString.clear();
+
+                        robot.delay(200);
+                        if (nowLanguage.equals("ko")) {
+                            robot.keyPress(KeyEvent.VK_G);
+                            robot.keyRelease(KeyEvent.VK_G);
+                            robot.keyPress(KeyEvent.VK_K);
+                            robot.keyRelease(KeyEvent.VK_K);
+                            robot.keyPress(KeyEvent.VK_S);
+                            robot.keyRelease(KeyEvent.VK_S);
+                        } else {
+                            robot.keyPress(KeyEvent.VK_E);
+                            robot.keyRelease(KeyEvent.VK_E);
+                            robot.keyPress(KeyEvent.VK_N);
+                            robot.keyRelease(KeyEvent.VK_N);
+                        }
+                        robot.waitForIdle();
+
+                    }
+                }
+            }
+        }, 0, 100);
+
+        /*
         while (true) {
 
             nowTopProcess =  util.nowTopProcess();
@@ -300,6 +348,7 @@ public class PreventRecover implements NativeKeyListener {
             }
 
         }
+        */
     }
 
     public void nativeKeyReleased(NativeKeyEvent e) {
