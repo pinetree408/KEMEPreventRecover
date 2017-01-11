@@ -22,11 +22,14 @@ import java.awt.Robot;
 import java.awt.event.KeyEvent;
 
 import com.pinetree408.keme.util.Util;
+import com.pinetree408.keme.util.ModeErrorLogger;
 
 public class PreventRecover implements NativeKeyListener {
 
     static Robot robot;
     static Util util;
+    /** buffer writer to save log */
+    private static ModeErrorLogger melogger;
     static String prevTopProcess;
     static String nowTopProcess;
 
@@ -56,6 +59,7 @@ public class PreventRecover implements NativeKeyListener {
         }
 
         util = new Util();
+        melogger = new ModeErrorLogger("result.txt");
         prevTopProcess = "initial";
         nowTopProcess = "initial";
 
@@ -192,6 +196,7 @@ public class PreventRecover implements NativeKeyListener {
                     break;
             }
 
+            melogger.log(e, nowLanguage, nowTopProcess, String.valueOf(recoverState), state);
         }
 
         if (state.equals("prevent")) {
@@ -307,48 +312,6 @@ public class PreventRecover implements NativeKeyListener {
             }
         }, 0, 100);
 
-        /*
-        while (true) {
-
-            nowTopProcess =  util.nowTopProcess();
-
-            if (nowTopProcess.equals("")) {
-                continue;
-            }
-
-            if (!prevTopProcess.equals(nowTopProcess)) {
-
-                state = "prevent";
-
-                prevTopProcess = util.nowTopProcess();
-
-                nowLanguage = util.nowLanguage();
-
-                limitNumber = 0;
-                recoverState = 1;
-                restoreString.clear();
-                tmpString.clear();
-
-                robot.delay(200);
-                if (nowLanguage.equals("ko")) {
-                    robot.keyPress(KeyEvent.VK_G);
-                    robot.keyRelease(KeyEvent.VK_G);
-                    robot.keyPress(KeyEvent.VK_K);
-                    robot.keyRelease(KeyEvent.VK_K);
-                    robot.keyPress(KeyEvent.VK_S);
-                    robot.keyRelease(KeyEvent.VK_S);
-                } else {
-                    robot.keyPress(KeyEvent.VK_E);
-                    robot.keyRelease(KeyEvent.VK_E);
-                    robot.keyPress(KeyEvent.VK_N);
-                    robot.keyRelease(KeyEvent.VK_N);
-                }
-                robot.waitForIdle();
-
-            }
-
-        }
-        */
     }
 
     public void nativeKeyReleased(NativeKeyEvent e) {
