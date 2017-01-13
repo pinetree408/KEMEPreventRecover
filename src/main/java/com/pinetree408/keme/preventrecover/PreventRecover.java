@@ -26,24 +26,23 @@ public class PreventRecover implements NativeKeyListener {
   static Robot robot;
   static Util util;
   /** buffer writer to save log */
-  private static ModeErrorLogger melogger;
+  private static ModeErrorLogger meLogger;
 
   static String prevTopProcess;
   static String nowTopProcess;
-
   static String nowLanguage;
-  private static String state;
 
-  private static int limitNumber;
+  private static int preventState;
+  private static final int checking = 0;
+  private static final int prevent = 1;
+  private static final int preChecking = 2;
+
   private static int recoverState;
-  /*
-   * state
-   * 1 : store
-   * 2 : recover
-   * */
+  private static final int store = 0;
+  private static final int recover = 1;
 
   private static ArrayList<Integer> restoreString;
-  private static ArrayList<Integer> tmpString;
+  private static int recoveredString;
 
   private static boolean cmdKeyPressed; // For mac
 
@@ -55,21 +54,19 @@ public class PreventRecover implements NativeKeyListener {
       // TODO Auto-generated catch block
       ex.printStackTrace();
     }
-
     util = new Util();
-    melogger = new ModeErrorLogger("result.txt");
+    meLogger = new ModeErrorLogger("result.txt");
+
     prevTopProcess = "initial";
     nowTopProcess = "initial";
+    nowLanguage = "initial";
 
-    limitNumber = 0;
-    recoverState = 1;
+    preventState = checking;
+    recoverState = store;
     restoreString = new ArrayList<Integer>();
-    tmpString = new ArrayList<Integer>();
+    recoveredString = 0;
 
     cmdKeyPressed = false;
-
-    nowLanguage = "initial";
-    state = "checking";
   }
 
   public boolean isLanguageChangeKeyPressed(int keyCode) {
@@ -112,136 +109,123 @@ public class PreventRecover implements NativeKeyListener {
 
   public void nativeKeyPressed(NativeKeyEvent e) {
 
-    if ((state.equals("checking")) && (limitNumber < 11)) {
+    switch (preventState) {
+      case checking:
+        if (restoreString.size() < 11) {
+          switch (recoverState) {
+            case store:
+              // ko/en change => e.getKeyCode = 112;
+              // backspace => e.getKeyCode = 14
 
-      switch (recoverState) {
-        case 1:
-
-          // ko/en change => e.getKeyCode = 112;
-          // backspace => e.getKeyCode = 14
-
-          /// mac command => 3676
-
-          if (e.getKeyCode() == 3676) {
-            cmdKeyPressed = true;
-          }
-
-          if (isLanguageChangeKeyPressed(e.getKeyCode()) == true && restoreString.size() != 0) {
-
-            if (canRecover(restoreString)) {
-
-              recoverState = 2;
-
-              if (Platform.isWindows()) {
-
-                try {
-                  util.robotInput(robot, restoreString, util.nowLanguage());
-                } catch (Exception e1) {
-                  // TODO Auto-generated catch block
-                  e1.printStackTrace();
-                }
+              /// mac command => 3676
+              if (e.getKeyCode() == 3676) {
+                cmdKeyPressed = true;
               }
-
-            } else {
-              restoreString.clear();
-              tmpString.clear();
-            }
-
-          } else {
-
-            // space => e.getKeyCode = 57
-            if (e.getKeyCode() == 57 && cmdKeyPressed == false) {
-              restoreString.clear();
-              tmpString.clear();
-            } else {
-              if (!(restoreString.size() == 0 && e.getKeyCode() == 14)) {
-                if ((e.getKeyCode() != 112) && (e.getKeyCode() != 14) && (e.getKeyCode() != 3676)) {
-                  restoreString.add(e.getKeyCode());
-                  tmpString.add(e.getKeyCode());
-                  limitNumber += 1;
+              if (isLanguageChangeKeyPressed(e.getKeyCode()) == true && restoreString.size() != 0) {
+                if (canRecover(restoreString)) {
+                  recoverState = recover;
+                  if (Platform.isWindows()) {
+                    try {
+                      util.robotInput(robot, restoreString, util.nowLanguage());
+                    } catch (Exception e1) {
+                      // TODO Auto-generated catch block
+                      e1.printStackTrace();
+                    }
+                  }
                 } else {
-                  if (restoreString.size() != 0
-                          && tmpString.size() != 0
+                  restoreString.clear();
+                  recoveredString = 0;
+                }
+              } else {
+                // space => e.getKeyCode = 57
+                if (e.getKeyCode() == 57 && cmdKeyPressed == false) {
+                  restoreString.clear();
+                  recoveredString = 0;
+                } else {
+                  if (!(restoreString.size() == 0 && e.getKeyCode() == 14)) {
+                    if ((e.getKeyCode() != 112)
+                        && (e.getKeyCode() != 14)
+                        && (e.getKeyCode() != 3676)) {
+                      restoreString.add(e.getKeyCode());
+                      recoveredString += 1;
+                    } else {
+                      if (restoreString.size() != 0
+                          && recoveredString != 0
                           && (e.getKeyCode() != 3676)) {
-                    restoreString.remove(restoreString.size() - 1);
-                    tmpString.remove(tmpString.size() - 1);
+                        restoreString.remove(restoreString.size() - 1);
+                        recoveredString -= 1;
+                      }
+                    }
                   }
                 }
               }
-            }
+              break;
+
+            case recover:
+              if (recoveredString == 0) {
+                recoveredString = restoreString.size();
+              } else if (recoveredString == 1) {
+                recoverState = store;
+                restoreString.clear();
+                recoveredString = 0;
+              } else if (e.getKeyCode() != 14 && e.getKeyCode() != 57) {
+                if (recoveredString != 0) {
+                  recoveredString -= 1;
+                }
+              }
+              break;
           }
+        }
+        break;
 
-          break;
-
-        case 2:
-          if (tmpString.size() == 0) {
-            tmpString.addAll(restoreString);
-          } else if (tmpString.size() == 1) {
-            recoverState = 1;
-            restoreString.clear();
-            tmpString.clear();
-          } else if (e.getKeyCode() != 14 && e.getKeyCode() != 57) {
-            if (tmpString.size() != 0) {
-              tmpString.remove(tmpString.size() - 1);
+      case prevent:
+        if (util.nowLanguage().equals("ko")) {
+          try {
+            if (util.getJavaKeyCode(e.getKeyCode()) == KeyEvent.VK_S) {
+              preventState = preChecking;
             }
+          } catch (Exception e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
           }
+        } else {
+          try {
+            if (util.getJavaKeyCode(e.getKeyCode()) == KeyEvent.VK_N) {
+              preventState = preChecking;
+            }
+          } catch (Exception e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+          }
+        }
+        break;
 
-          break;
-      }
-      melogger.log(e, nowLanguage, nowTopProcess, String.valueOf(recoverState), state);
-    }
-
-    if (state.equals("prevent")) {
-      if (util.nowLanguage().equals("ko")) {
+      case preChecking:
+        if (util.nowLanguage().equals("ko")) {
+          robot.keyPress(KeyEvent.VK_BACK_SPACE);
+          robot.keyRelease(KeyEvent.VK_BACK_SPACE);
+          robot.keyPress(KeyEvent.VK_BACK_SPACE);
+          robot.keyRelease(KeyEvent.VK_BACK_SPACE);
+        } else {
+          robot.keyPress(KeyEvent.VK_BACK_SPACE);
+          robot.keyRelease(KeyEvent.VK_BACK_SPACE);
+          robot.keyPress(KeyEvent.VK_BACK_SPACE);
+          robot.keyRelease(KeyEvent.VK_BACK_SPACE);
+          robot.keyPress(KeyEvent.VK_BACK_SPACE);
+          robot.keyRelease(KeyEvent.VK_BACK_SPACE);
+        }
         try {
-          if (util.getJavaKeyCode(e.getKeyCode()) == KeyEvent.VK_S) {
-            state = "pre-checking";
-          }
+          robot.keyPress(util.getJavaKeyCode(e.getKeyCode()));
+          robot.keyRelease(util.getJavaKeyCode(e.getKeyCode()));
         } catch (Exception e1) {
           // TODO Auto-generated catch block
           e1.printStackTrace();
         }
-      } else {
-        try {
-          int keyCode = util.getJavaKeyCode(e.getKeyCode());
-          if (keyCode == KeyEvent.VK_N) {
-            state = "pre-checking";
-          }
-        } catch (Exception e1) {
-          // TODO Auto-generated catch block
-          e1.printStackTrace();
-        }
-      }
-    } else if (state.equals("pre-checking")) {
-
-      if (util.nowLanguage().equals("ko")) {
-        robot.keyPress(KeyEvent.VK_BACK_SPACE);
-        robot.keyRelease(KeyEvent.VK_BACK_SPACE);
-        robot.keyPress(KeyEvent.VK_BACK_SPACE);
-        robot.keyRelease(KeyEvent.VK_BACK_SPACE);
-        robot.keyPress(KeyEvent.VK_BACK_SPACE);
-        robot.keyRelease(KeyEvent.VK_BACK_SPACE);
-        robot.keyPress(KeyEvent.VK_BACK_SPACE);
-        robot.keyRelease(KeyEvent.VK_BACK_SPACE);
-      } else {
-        robot.keyPress(KeyEvent.VK_BACK_SPACE);
-        robot.keyRelease(KeyEvent.VK_BACK_SPACE);
-        robot.keyPress(KeyEvent.VK_BACK_SPACE);
-        robot.keyRelease(KeyEvent.VK_BACK_SPACE);
-        robot.keyPress(KeyEvent.VK_BACK_SPACE);
-        robot.keyRelease(KeyEvent.VK_BACK_SPACE);
-      }
-
-      try {
-        robot.keyPress(util.getJavaKeyCode(e.getKeyCode()));
-        robot.keyRelease(util.getJavaKeyCode(e.getKeyCode()));
-      } catch (Exception e1) {
-        // TODO Auto-generated catch block
-        e1.printStackTrace();
-      }
-
-      state = "checking";
+        preventState = checking;
+        break;
     }
+    meLogger.log(
+        e, nowLanguage, nowTopProcess, String.valueOf(preventState), String.valueOf(recoverState));
   }
 
   public static void main(String[] args) {
@@ -272,16 +256,15 @@ public class PreventRecover implements NativeKeyListener {
 
               if (!prevTopProcess.equals(nowTopProcess)) {
 
-                state = "prevent";
+                preventState = prevent;
 
                 prevTopProcess = util.nowTopProcess();
 
                 nowLanguage = util.nowLanguage();
 
-                limitNumber = 0;
-                recoverState = 1;
+                recoverState = store;
                 restoreString.clear();
-                tmpString.clear();
+                recoveredString = 0;
 
                 robot.delay(200);
                 if (nowLanguage.equals("ko")) {
